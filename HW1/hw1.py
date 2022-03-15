@@ -104,8 +104,6 @@ def LUdecomposition(A):
                 for t in range(k):
                     L[i][k] -= (L[i][t]*U[t][k])
                 L[i][k] /= U[k][k]
-    # print('L ', L)
-    # print('U ', U)
 
     #get inverse of L
     L_inverse = np.zeros([n, n])
@@ -115,7 +113,6 @@ def LUdecomposition(A):
         for i in range(k+1, n):
             for t in range(i):
                 L_inverse[i][k] -= (L[i][t]*L_inverse[t][k])
-    # print('inverse L ', L_inverse)
 
     #get inverse of U
     U_inverse = np.zeros([n, n])
@@ -126,11 +123,9 @@ def LUdecomposition(A):
             for t in range(i+1, k+1):
                 U_inverse[i][k] -= (U[i][t]*U_inverse[t][k])
             U_inverse[i][k] /= U[i][i]
-    # print('inverse U ', U_inverse)
 
     #get inverse of A = inverse of U * inverse of L
     A_inverse = M_multi(U_inverse, L_inverse)
-
     return A_inverse
 
 def LSE(A, b, L):
@@ -203,11 +198,6 @@ def Visul(data, w1, w2, n):
     plt.show()
     return
 
-
-# n = input('input of matrix n*n')
-# D = [[3,5,7,2], [1,4,7,2], [6,3,9,17], [13,5,4,16]]
-# print('matrix', D)
-# print('inverse', LUdecomposition(D))
 
 #read the data file
 D, A, b, n, l = Input()
