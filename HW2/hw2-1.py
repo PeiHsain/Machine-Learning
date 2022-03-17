@@ -1,9 +1,6 @@
 # 2022ML homework2-1 created by Pei Hsuan Tsai
 # Naive Bayes classifier
 
-from itertools import count
-from pickle import FALSE, TRUE
-from unicodedata import category
 import numpy as np
 import gzip
 import math
@@ -39,7 +36,6 @@ def ParseData():
                     tmpIm[i][j] = int.from_bytes(f.read(1), byteorder='big', signed=False)
             trainIm.append(tmpIm)
 
-
     #Train lable
     print("Parsing traning label...")
     with gzip.open(PATH+TrainLableF, 'r') as f:
@@ -50,7 +46,6 @@ def ParseData():
         trainL = []
         for n in range(TrainSet):
             trainL.append(int.from_bytes(f.read(1), byteorder='big', signed=False)) #Convert bytes to integer (big-endian)
-
 
     #Test Image
     print("Parsing testing image...")
@@ -80,16 +75,20 @@ def ParseData():
         for n in range(TestSet):
             testL.append(int.from_bytes(f.read(1), byteorder='big', signed=False)) #Convert bytes to integer (big-endian)
 
-
     return trainIm, trainL, testIm, testL
 
-def PosteriorPrint(Posterior, label):
-    'Print out the the posterior (in log scale to avoid underflow) of the ten categories (0-9) for each image in INPUT 3. Print out the prediction which is the category and correct answer (lable).\nReturn prediction correct(0) or not(1).'
+def PosteriorPrint(Posterior, label, mode):
+    'Print out the the posterior (in log scale to avoid underflow) of the ten categories (0-9) for each image, and the prediction and correct answer (lable).\nOutput : prediction correct(0) or not(1).'
     print("Posterior (in log scale):")
     for i in range(10):
         print(i, ": ", Posterior[i])
-    #Returns the indices of the maximum values
-    prediction = np.argmax(Posterior)
+    #for mode discrete(0) or continuous(1)
+    if mode == 0:
+        #Returns the indices of the maximum values
+        prediction = np.argmax(Posterior)
+    elif mode == 1:
+        #Returns the indices of the minimum values -> liklihood will be min when x close to mean
+        prediction = np.argmin(Posterior)        
     print("Prediction: ", prediction, end="")
     print(", Ans: ", label)
 
@@ -99,21 +98,24 @@ def PosteriorPrint(Posterior, label):
     else: #error
         return 1
 
-def ImagePrint(Image):
+def ImagePrint(Image, mode):
     'Print out the imagination of numbers in Bayes classifier.\n28x28 binary image which 0 (expect less than 128) represents a white pixel, and 1 (otherwise) represents a black pixel.'
     print("Imagination of numbers in Bayes classifier:")
     for n in range(10):
         print(n, ":")
         for i in range(ImageSize):
             for j in range(ImageSize):
-                bin = np.argmax(Image[n][i*ImageSize+j])
-                if bin < 16 : #less than value 128 = less than bin 16
+                #for mode discrete(0) or continuous(1)
+                if mode == 0:
+                    values = np.argmax(Image[n][i*ImageSize+j]) * 8
+                elif mode == 1:
+                    values = Image[n][i*ImageSize+j]
+                #less than value 128     
+                if values < 128 :
                     print("0", end=" ")
                 else:
                     print("1", end=" ")
             print()
-
-
     return
 
 def Discrete(train_I, train_L, test_I, test_L):
@@ -149,9 +151,9 @@ def Discrete(train_I, train_L, test_I, test_L):
         #marginalize them so sum it up will equal to 1
         posterior /= postSum
         #print each posterior, prediction and answer
-        error += PosteriorPrint(posterior, test_L[n])
+        error += PosteriorPrint(posterior, test_L[n], 0)
     #print my Bayes classifier image 0-9
-    ImagePrint(pixelBin)
+    ImagePrint(pixelBin, 0)
 
     #Calculate and print the error rate
     error /= TestSet
@@ -160,11 +162,56 @@ def Discrete(train_I, train_L, test_I, test_L):
 
 def Continuous(train_I, train_L, test_I, test_L):
     'Use MLE to fit a Gaussian distribution for the value of each pixel.'
+    categoryP = np.zeros(10) #save count of categories 0-9
+    meanMLE = np.ones([10, ImageSize*ImageSize]) #save mean of each category of each unit
+    varianceMLE = np.ones([10, ImageSize*ImageSize]) #save variance of each category of each unit
+
+    print("Continuous Mode :")
+
+    #training model, calculate MLE mean(sum(x/N)) and MLE variance^2(sum((x-mean)^2/N)) for each category
+    #calculate mean MLE = sum x/N
+    for n in range(TrainSet):
+        categoryP[train_L[n]] += 1 #which category
+        for i in range(ImageSize):
+            for j in range(ImageSize):
+                meanMLE[train_L[n]][i*ImageSize+j] += train_I[n][i][j]
+    for t in range(10):
+        meanMLE[t] /= categoryP[t] #mean of each categories of each unit
+    #calculate variance MLE = sum (x-m)^2/N
+    for n in range(TrainSet):
+        for i in range(ImageSize):
+            for j in range(ImageSize):
+                varianceMLE[train_L[n]][i*ImageSize+j] += (train_I[n][i][j] - meanMLE[train_L[n]][i*ImageSize+j]) ** 2
+    for t in range(10):
+        varianceMLE[t] /= categoryP[t] #variance of each categories of each unit
+    categoryP /= TrainSet #probability of categories
+
+    #testing model, calculate posterior of each category for each sample, log(post)=log(likelihood)+log(prior)
+    posterior = np.zeros(10)
+    error = 0
+    for n in range(TestSet):
+        print("Data", n+1)
+        postSum = 0
+        for c in range(10):
+            posterior[c] = math.log(categoryP[c]) #log(prior)
+            #log(likelihood)=-sum(log(2*pi*variance)/2 - sum((x-mean)^2/(2*variance))
+            for i in range(ImageSize):
+                for j in range(ImageSize):
+                    tmp = ((test_I[n][i][j] - meanMLE[c][i*ImageSize+j]) ** 2) / (2 * varianceMLE[c][i*ImageSize+j])
+                    tmp2 = math.log(2 * math.pi * varianceMLE[c][i*ImageSize+j]) / 2
+                    posterior[c] -= (tmp2 + tmp)
+            postSum += posterior[c]
+        #marginalize them so sum it up will equal to 1
+        posterior /= postSum
+        #print each posterior, prediction and answer
+        error += PosteriorPrint(posterior, test_L[n], 1)
+    #print my Bayes classifier image 0-9
+    ImagePrint(meanMLE, 1)
+
+    #Calculate and print the error rate
+    error /= TestSet
+    print("Error rate: ", error)
     return
-
-
-
-
 
 
 #INPUT 1: Training image data
