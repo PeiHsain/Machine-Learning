@@ -13,3 +13,14 @@ Write a program that can do regularized linear model regression (polynomial basi
 3. Prove Beta-Binomial conjugation
 
     Try to proof Beta-Binomial conjugation and write the process on paper.
+
+# HW3
+1. Random Data Generator
+
+    a. Univariate gaussian data generator.  b. Polynomial basis linear model data generator.
+
+2. Sequential Estimator
+
+    Sequential estimate the mean and variance.
+
+3. Baysian Linear regression
