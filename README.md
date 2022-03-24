@@ -17,7 +17,9 @@ Write a program that can do regularized linear model regression (polynomial basi
 # HW3
 1. Random Data Generator
 
-    a. Univariate gaussian data generator.  b. Polynomial basis linear model data generator.
+    a. Univariate gaussian data generator.
+    
+    b. Polynomial basis linear model data generator.
 
 2. Sequential Estimator
 
