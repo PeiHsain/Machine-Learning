@@ -13,7 +13,6 @@ Write a program that can do regularized linear model regression (polynomial basi
 3. Prove Beta-Binomial conjugation
 
     Try to proof Beta-Binomial conjugation and write the process on paper.
-
 # HW3
 1. Random Data Generator
 
@@ -26,3 +25,14 @@ Write a program that can do regularized linear model regression (polynomial basi
     Sequential estimate the mean and variance.
 
 3. Baysian Linear regression
+
+    Use Baysian Linear regression to update the prior, and calculate the parameters of predictive distribution.
+# HW4
+1. Logistic regression
+
+    Use Logistic regression to separate D1 and D2. Implement both Newton's and steepest gradient descent method during optimization.
+
+2. EM algorithm
+
+    Use EM algorithm to cluster each image into ten groups. Treating all pixels as random variables
+following Bernoulli distributions. (Training data and label sets are same as HW02)
