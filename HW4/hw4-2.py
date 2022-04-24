@@ -19,27 +19,27 @@ ImageSize = 28
 Num_Class = 10
 
 
-def ConfusionMat(i, y_label, y_pred):
+def ConfusionMat(num, y_label, y_pred):
     'Create and print the confusion matrix w.\nOutput : the confusion matrix'
-    print(f'Confusion Matrix {i}:')
+    print(f'Confusion Matrix {num}:')
     # TP = [0][0], FN = [0][1], FP = [1][0], TN = [1][1]
     mat = np.zeros([2, 2])
     # Calculate TP, FN, FP, TN
     for i in range(len(y_pred)):
-        if y_pred[i] == y_label[i]:
-            if y_label[i] == 0:
+        if y_label[i] == num:
+            if y_pred[i] == num:
                 mat[0][0] += 1  # TP
             else:
-                mat[1][1] += 1  # TN
-        else:
-            if y_label[i] == 0:
                 mat[0][1] += 1  # FN
-            else:
+        else:
+            if y_pred[i] == num:
                 mat[1][0] += 1  # FP
+            else:
+                mat[1][1] += 1  # TN
     # Print matrix
-    print(f'\t\tPredict number {i}\tPredict not number {i}')
-    print(f'Is number {i}\t\t{mat[0][0]}\t\t\t{mat[0][1]}')
-    print(f"Is's number {i}\t\t{mat[1][0]}\t\t\t{mat[1][1]}")
+    print(f'\t\tPredict number {num}\tPredict not number {num}')
+    print(f'Is number {num}\t\t{mat[0][0]}\t\t\t{mat[0][1]}')
+    print(f"Is's number {num}\t\t{mat[1][0]}\t\t\t{mat[1][1]}")
     return mat
 
 
@@ -115,8 +115,8 @@ def AssignLabel(train_L, w):
         # The most possible number for class
         label[classL] = best_num
         # Clear the match
-        match[classL, :] = 0
-        match[:, best_num] = 0
+        match[classL, :] = -1
+        match[:, best_num] = -1
 
     return label
 
@@ -134,7 +134,7 @@ def ImagePrint(Image, label=None, End=False):
 
         for i in range(ImageSize*ImageSize):
             # less than value 0.5 -> 0, else 1
-            if Image[num][i] < 0.5 :
+            if Image[int(num)][i] < 0.5:
                 print("0", end=" ")
             else:
                 print("1", end=" ")
@@ -148,7 +148,7 @@ def EM(train_I, train_L):
     # Initial
     iteration = 0
     converge = False
-    conv_range = 15
+    conv_range = 20
     errorRate = 0
     # probability of appear 0~9 (lembda MLE) -> initial probability are all same
     lembda = np.full((Num_Class), 1/Num_Class)
@@ -211,29 +211,31 @@ def EM(train_I, train_L):
         if diff <= conv_range:
             converge = True
 
-    # # Print out the labeled imagination
-    # Labeled = AssignLabel(train_L, w)
-    # ImagePrint(P, Labeled, True)
+    # Print out the labeled imagination
+    Labeled = AssignLabel(train_L, w)
+    ImagePrint(P, Labeled, True)
 
-    # # Prediction
-    # y_pred = np.zeros(TrainSet)
-    # for i in range(TrainSet):
-    #     y_pred[i] = np.argmax(w[i])
+    # Prediction, find the index of specific Labeled  (labeled class for possible w)
+    y_pred = np.zeros(TrainSet)
+    for i in range(TrainSet):
+        possible_w = np.argmax(w[i])
+        y_pred[i] = np.where(Labeled == possible_w)[0][0]
 
-    # # Output a confusion matrix, the sensitivity and specificity of the clustering applied to the training data
-    # for i in range(Num_Class):
-    #     # Print the confusion matrix
-    #     confusion = ConfusionMat(i, y_label, y_pred)
-    #     # Calculate sensitivity and specificity
-    #     Sensitivity(i, confusion)
-    #     Specificity(i, confusion)
-    #     print("------------------------------------")
-    #     errorRate += (confusion[0][1] + confusion[1][0]) / TrainSet
+    # Output a confusion matrix, the sensitivity and specificity of the clustering applied to the training data
+    for i in range(Num_Class):
+        # Print the confusion matrix
+        confusion = ConfusionMat(i, train_L, y_pred)
+        # Calculate sensitivity and specificity
+        Sensitivity(i, confusion)
+        Specificity(i, confusion)
+        print("------------------------------------")
+        errorRate += confusion[0][0]
 
-    # errorRate /= Num_Class
-    # # Total result
-    # print(f'Total iteration to converage:{iteration}')
-    # print(f'Total error rate:{errorRate}')
+    # Error rate = 1 - correct rate
+    errorRate = 1 - (errorRate / TrainSet)
+    # Total result
+    print(f'Total iteration to converage:{iteration}')
+    print(f'Total error rate:{errorRate}')
     return
 
 
