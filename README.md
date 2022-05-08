@@ -36,3 +36,11 @@ Write a program that can do regularized linear model regression (polynomial basi
 
     Use EM algorithm to cluster each image into ten groups. Treating all pixels as random variables
 following Bernoulli distributions. (Training data and label sets are same as HW02)
+# HW5
+1. Gausian Process
+
+    Implement the Gaussian Process and Visualize the result. Apply Gaussian Process Regression to predict the distribution of f. Optimize the Kernel Parameters by minimizing negative marginal log-likelihood.
+
+2. SVM on MNIST
+
+    Use SVM models to tackle classification on images of hand-written digits.
