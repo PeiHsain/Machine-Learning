@@ -93,19 +93,19 @@ def GridSearch(mode, X, Y, n):
             # best performing parameters
             if acc > best_score:
                 best_score = acc
-                best_parameters = f'-t 0 -c {c} -v {n}'
+                best_parameters = f'-t 0 -c {c}'
     elif mode == 1: # poly -> C, gamma, e, Q
         for q in degree_range:
             for e in coef_range:
                 for gamma in gamma_range:
                     for c in C_range:
                         # for every possible parameter combination, train the model with n cross-validation
-                        param = f'-t 1 -d {q} -r {e} -c {c} -v {n}'
+                        param = f'-t 1 -d {q} -g {gamma} -r {e} -c {c} -v {n}'
                         acc = svm_train(Y, X, param)  # If cross validation is used, either accuracy (ACC) or mean-squared error (MSE) is returned
                         # best performing parameters
                         if acc > best_score:
                             best_score = acc
-                            best_parameters = f'-t 1 -d {q} -r {e} -c {c} -v {n}'
+                            best_parameters = f'-t 1 -d {q} -g {gamma} -r {e} -c {c}'
     elif mode == 2: # RBF -> C, gamma
         for gamma in gamma_range:
             for c in C_range:
@@ -115,7 +115,7 @@ def GridSearch(mode, X, Y, n):
                 # best performing parameters
                 if acc > best_score:
                     best_score = acc
-                    best_parameters = f'-t 2 -g {gamma} -c {c} -v {n}'
+                    best_parameters = f'-t 2 -g {gamma} -c {c}'
     return best_parameters
     
 
@@ -135,11 +135,10 @@ if __name__ == '__main__':
     # Task 2
     # Grid search for the best performing parameters
     n = 3   # n cross-validation
-    param = GridSearch(2, train_X, train_Y, n)  # 0 -> linear, 1 -> poly, 2 -> RBF
-    best_param = param.replace(f' -v {n}', '')  # remove '-v'
-    model_SVC = svm_train(train_Y, train_X, best_param)  # C-SVC train by the best parameters
+    param = GridSearch(1, train_X, train_Y, n)  # 0 -> linear, 1 -> poly, 2 -> RBF
+    model_SVC = svm_train(train_Y, train_X, param)  # C-SVC train by the best parameters
     res_SVC = svm_predict(test_Y, test_X, model_SVC)    # prediction
-    print(f'Best parameter: {best_param}')
+    print(f'Best parameter: {param}')
 
     # Task 3
     # Use linear kernel + RBF kernel together, normalize
