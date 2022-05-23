@@ -45,10 +45,10 @@ following Bernoulli distributions. (Training data and label sets are same as HW0
 
     Use SVM models to tackle classification on images of hand-written digits.
 # HW6
-1. kernel k-means
+1. Kernel k-means
 
     Implement kernel k-means.
 
-2. spectral clustering
+2. Spectral clustering
 
     Implement spectral clustering, both normalized cut and ratio cut.
