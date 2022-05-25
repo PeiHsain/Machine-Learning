@@ -1,15 +1,10 @@
 """
 2022ML homework6_1 created by Pei Hsuan Tsai.
 Kernel k-means
-Spectral clustering (both normalized cut and ratio cut ).
     Part 1: How the clustering procedure and spectral clustering.
     Part 2: In addition to cluster data into 2 clusters, try more clusters (e.g. 3 or 4 ...) and show your results.
     Part 3: Try different ways to initialize kernel k-means, (e.g. k-means++) and spectral clustering.
-    Part 4: For spectral clustering (both normalized cut and ratio cut), try to examine whether the data points within the
-            same cluster do have the same coordinates in the eigenspace of graph Laplacian or not.
 """
-
-# In[2]:
 
 
 import numpy as np
@@ -63,8 +58,6 @@ def GramMatrix(data, gammaS, gammaC):
             matrix[j][i] = matrix[i][j]
     return matrix
 
-
-# In[2]:
 
 def MinDist(index, centers):
     'Find the min distance to centers.\nOutput : min distance'
@@ -143,7 +136,7 @@ def KernelDist(k, kernel, c, a):
     return dis     
     
 
-def Kmean(k, init_c, init_a, kernel):
+def Kmean(k, init_c, init_a, kernel, img):
     'Implement kernel k-mean to clustering.'
     iter = 0
     converge = 0
@@ -163,10 +156,9 @@ def Kmean(k, init_c, init_a, kernel):
             assign[int(cluster[i])][i] = 1
         for n in range(k):
             c[n] = np.sum(assign[n])
-        print(c)
         # Visualization
         iter += 1
-        Visualization(cluster, iter)
+        Visualization(cluster, iter, img)
         # check if it converge
         if Converge(old_assign, assign) == True:
             converge += 1
@@ -174,42 +166,46 @@ def Kmean(k, init_c, init_a, kernel):
             converge == 0
 
 
-def Visualization(cluster, iter):
+def Visualization(cluster, iter, orig_img):
     'Visualize the cluster assignments of data points in each iteration.\nOutput: image of each iteration'
-    img = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    img = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8) # Clustering image
+    o_img =  np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)  # Original image
     # Cluster the image
     for i in range(IMG_LENGTH):
         img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = COLOR[int(cluster[i])]
+        o_img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = orig_img[i][1]
     # Change BGR to RGB
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    # Show image
+    o_img = cv2.cvtColor(o_img, cv2.COLOR_RGB2BGR)
+    # Plot clustering and origianl images
+    fig = plt.figure()
+    # Show clustering image 
+    fig.add_subplot(1, 2, 1)
     plt.title(f"Kernel K-Mean, iteration={iter}")
     plt.imshow(img)
+    # Show origianl image
+    fig.add_subplot(1, 2, 2)
+    plt.title(f"Original image")
+    plt.imshow(o_img)
+
     plt.show()
-    # plt.imsave(f'./kernel_random_k2/{iter}.png', img)
-
-# In[2]:
-
+    fig.savefig(f'./kernel_plusplus_k3_image1/{iter}.png')
 
 
 if __name__ == '__main__':
     Image1, Image2 = InputData()
     gammaS = 1 / IMG_LENGTH
     gammaC = 1 / 256
-    K = 2
-
-# In[2]:
-
+    K = 3
 
     # Compute the Gram matrix by kernel
-    print("Compute Gram matrix......")
-    gram_matrix = GramMatrix(Image1, gammaS, gammaC)
-
-# In[2]:
+    print("Compute Gram matrix for image1......")
+    gram_matrix1 = GramMatrix(Image1, gammaS, gammaC)
+    print("Compute Gram matrix for image2......")
+    gram_matrix2 = GramMatrix(Image2, gammaS, gammaC)
 
     # Kernel K-mean
     # Initial, random mode = 1, k-mean++ mode = 2
-    init_C, init_a = InitialMean(mode=1, k=K)
-    Kmean(K, init_C, init_a, gram_matrix)
-
-# %%
+    init_C, init_a = InitialMean(mode=2, k=K)
+    Kmean(K, init_C, init_a, gram_matrix1, Image1)  # image1
+    Kmean(K, init_C, init_a, gram_matrix2, Image2)  # image2
