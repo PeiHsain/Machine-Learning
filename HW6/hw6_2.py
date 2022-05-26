@@ -148,13 +148,13 @@ def Kmean(k, U, img):
     while converge < 3:
         old_cluster = np.copy(cluster)
         # E-step: find argmin||x - center|| to assign r
-        r = np.zeros((IMG_LENGTH, k))
+        r = np.zeros((k, IMG_LENGTH))
         for i in range(IMG_LENGTH):
             cluster[i] = MinDistCluster(U[i], c)
-            r[i][int(cluster[i])] = 1
+            r[int(cluster[i])][i] = 1
         # M-step: update centers ck = sum(rk*x) / sum_(rk)
         for n in range(k):
-            r_sum = np.sum(r[:, n])
+            r_sum = np.sum(r[n])
             data_for_k = np.zeros(k)
             for i in range(IMG_LENGTH):
                 if cluster[i] == n:
@@ -194,7 +194,7 @@ def Visualization(cluster, iter, orig_img):
     plt.imshow(o_img)
 
     plt.show()
-    # fig.savefig(f'./spetral_normal_random_k2_image1/{iter}.png')
+    fig.savefig(f'./spetral_normal_random_k3_image2/{iter}.png')
 
 
 def PlotEigenspace(k, U, cluster):
@@ -203,23 +203,26 @@ def PlotEigenspace(k, U, cluster):
     if k == 2:
         x = [[], []]
         y = [[], []]
+        plt.title(f"2D eigenspace")
         for i in range(IMG_LENGTH):
             x[int(cluster[i])].append(U[i][0])
             y[int(cluster[i])].append(U[i][1])
         for n in range(k):
-            plt.scatter(x[n], y[n], color=COLOR_SCATTER[n])
+            plt.scatter(x[n], y[n], color=COLOR_SCATTER[n], s=0.5)
     elif k == 3:
         x = [[], [], []]
         y = [[], [], []]
         z = [[], [], []]
+        plt.title(f"3D eigenspace")
+        ax = fig.add_subplot(projection='3d')
         for i in range(IMG_LENGTH):
             x[int(cluster[i])].append(U[i][0])
             y[int(cluster[i])].append(U[i][1])
             z[int(cluster[i])].append(U[i][2])
         for n in range(k):
-            plt.scatter(x[n], y[n], color=COLOR_SCATTER[n])
+            ax.scatter(x[n], y[n], z[n], color=COLOR_SCATTER[n], s=0.5)
     plt.show()
-    # fig.savefig(f'./spetral_normal_random_k2_image1/eigenspace.png')
+    fig.savefig(f'./spetral_normal_random_k3_image2/eigenspace.png')
 
 
 def NormalizedCut(k, D, W):
@@ -233,6 +236,7 @@ def NormalizedCut(k, D, W):
         if D_sqrt[i][i] != 0:
             D_inv[i][i] = 1 / D_sqrt[i][i]
     Lsym = np.matmul(np.matmul(D_inv, L), D_inv)
+    # print('Lsym ', Lsym[0])
     # Compute eigenvector matrix U(n*k)
     eigenValue, eigenVector = np.linalg.eig(Lsym)
     eigenIndex = np.argsort(eigenValue) # sort eigenvalues
@@ -240,7 +244,7 @@ def NormalizedCut(k, D, W):
     # Normalize U as normalized matrix T, tij = uij / sqrt(sum_k(uik^2))
     U_sum = np.sqrt(np.sum((U ** 2), axis=1)).reshape(-1, 1)
     T = U / U_sum
-    return U, T
+    return U.real, T.real
 
 
 def RatioCut(k, D, W):
@@ -261,7 +265,8 @@ if __name__ == '__main__':
     Image1, Image2 = InputData()
     gammaS = 1 / IMG_LENGTH
     gammaC = 1 / 256
-    K = 2
+    K = 3
+
 
 # In[2]:
 
@@ -278,20 +283,20 @@ if __name__ == '__main__':
 
     # Spectral cluster
     # Normalized cut
-    U1, T1 = NormalizedCut(K, D1, W1)   # image1
-    # U2, T2 = NormalizedCut(K, D2, W2) # image2
+    # U1, T1 = NormalizedCut(K, D1, W1)   # image1
+    U2, T2 = NormalizedCut(K, D2, W2) # image2
     # Ratio cut
-    # U1 = RatioCut(D1, W1) # image1
-    # U2 = RatioCut(D2, W2) # image2
+    # U1 = RatioCut(K, D1, W1) # image1
+    # U2 = RatioCut(K, D2, W2) # image2
 
-    res1 = Kmean(K, U1, Image1)  # image1 for normalized cut
-    # res2 = Kmean(K, T2, Image2)  # image2 for normalized cut
+    # res1 = Kmean(K, T1, Image1)  # image1 for normalized cut
+    res2 = Kmean(K, T2, Image2)  # image2 for normalized cut
     # res1 = Kmean(K, U1, Image1)  # image1 for ratio cut
     # res2 = Kmean(K, U2, Image2)  # image2 for ratio cut
     # Plot the eigenspace of graph Laplacian
 
-# In[2]:
     if K < 4:
-        PlotEigenspace(K, U1, res1) # image1
-        # PlotEigenspace(K, U2, res2) # image2
+        # PlotEigenspace(K, U1, res1) # image1
+        PlotEigenspace(K, U2, res2) # image2
+
 # %%
