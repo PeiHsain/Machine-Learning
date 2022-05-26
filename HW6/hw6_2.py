@@ -8,8 +8,6 @@ Spectral clustering (both normalized cut and ratio cut ).
             same cluster do have the same coordinates in the eigenspace of graph Laplacian or not.
 """
 
-# In[2]:
-
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,20 +25,21 @@ def InputData():
     # Read images using matplotlib
     read1 = cv2.imread('image1.png')
     read2 = cv2.imread('image2.png')
-    img1 = []
-    img2 = []
+    img1 = np.zeros((IMG_LENGTH, 3), dtype=np.float32)
+    img2 = np.zeros((IMG_LENGTH, 3), dtype=np.float32)
     for i in range(IMG_SIZE):
         for j in range(IMG_SIZE):
             # coordinate of data, RGB of data
-            img1.append((np.array([j, i]), read1[i][j]))
-            img2.append((np.array([j, i]), read2[i][j]))
+            img1[int(i*IMG_SIZE+j)] = np.array(read1[i][j], dtype=np.uint32)
+            img2[int(i*IMG_SIZE+j)] = np.array(read2[i][j], dtype=np.uint32)
     return img1, img2
 
 
 def Distance(x1, x2):
     'Calculate the distance between two points.\nOutput : distance'
-    dis = np.sum((x1 - x2) ** 2)
-    return dis
+    x = (x1%IMG_SIZE) - (x2%IMG_SIZE)
+    y = (x1//IMG_SIZE) - (x2//IMG_SIZE)
+    return (x**2) + (y**2)
 
 
 def Kernel(x1, x2, gammaS, gammaC):
@@ -48,24 +47,24 @@ def Kernel(x1, x2, gammaS, gammaC):
     # Multiplying two RBF kernels in order to consider spatial similarity and color similarity at the same time.
     # kernel(x, x') = exp(-gammaS * ||S(x)-S(x')||^2) * exp(-gammaC * ||C(x)-C(x')||^2)
     spatial = -gammaS * Distance(x1[0], x2[0])
-    color = -gammaC * Distance(x1[1], x2[1])
+    color = -gammaC * np.sum((x1[1] - x2[1]) ** 2)
     kernel = np.exp(spatial) * np.exp(color)
     return kernel
 
 
 def GramMatrix(data, gammaS, gammaC):
     'Compute Gram matrix by defined kernel.\nOutput : Gram matrix'
-    matrix = np.zeros((IMG_LENGTH, IMG_LENGTH))
+    matrix = np.zeros((IMG_LENGTH, IMG_LENGTH), dtype=np.float32)
     for i in range(IMG_LENGTH):
         for j in range(i, IMG_LENGTH):
-            matrix[i][j] = Kernel(data[i], data[j], gammaS, gammaC)
+            matrix[i][j] = Kernel([i, data[i]], [j, data[j]], gammaS, gammaC)
             matrix[j][i] = matrix[i][j]
     return matrix
 
 
 def DegreeMatrix(w):
     'Compute degree matrix by similarity matrix.\nOutput : degree matrix'
-    D = np.zeros((IMG_LENGTH, IMG_LENGTH))
+    D = np.zeros((IMG_LENGTH, IMG_LENGTH), dtype=np.float32)
     # Degree dv = sum_u(Wvu)
     d = np.sum(w, axis=1)
     # Degree matrix D is diagonal matrix, Dvu = dv for v=u
@@ -74,23 +73,19 @@ def DegreeMatrix(w):
     return D
 
 
-# In[2]:
-
 def MinDist(x, centers):
     'Find the min distance to centers.\nOutput : min distance'
-    min_dist = 100000000 
+    dis = []
     # Compute spatial distance
     for i in range(len(centers)):
-        dis = np.sum((x-centers[i]) ** 2)
-        if dis < min_dist:
-            min_dist = dis
-    return min_dist
+        dis.append(np.sum((x-centers[i]) ** 2))
+    return np.min(dis)
 
 
 def InitialMean(mode, k, U):
     'Initial the mean for k-mean by mode. Random mode = 1, ++ mode = 2.\nOutput : k centers'
     # assign = np.zeros((k, IMG_LENGTH))
-    C = np.zeros((k, k))
+    C = np.zeros((k, k), dtype=np.float32)
     if mode == 1:
         # Random pick k canters
         center_index = np.random.choice(IMG_LENGTH, k, replace=False)
@@ -104,7 +99,7 @@ def InitialMean(mode, k, U):
         # find the farest point to give high probability
         for n in range(1, k):
             dist_sum = 0
-            min_dis = np.zeros(IMG_LENGTH)
+            min_dis = np.zeros(IMG_LENGTH, dtype=np.float32)
             for i in range(IMG_LENGTH):
                 min_dis[i] = MinDist(U[i], C)
                 dist_sum += min_dis[i]
@@ -113,7 +108,7 @@ def InitialMean(mode, k, U):
             # untill (Random - dist(x)) < 0, x be as new center
             for i in range(IMG_LENGTH):
                 Random -= min_dis[i]
-                if Random < 0:
+                if Random <= 0:
                     C[n] = U[i]
                     break
     return C
@@ -143,12 +138,12 @@ def Kmean(k, U, img):
     iter = 0
     converge = 0
     # assign = np.copy(init_a)
-    cluster = np.zeros(IMG_LENGTH)
+    cluster = np.zeros(IMG_LENGTH, dtype=np.uint32)
     # Until converge -> converge time = 3
-    while converge < 3:
+    while converge < 1:
         old_cluster = np.copy(cluster)
         # E-step: find argmin||x - center|| to assign r
-        r = np.zeros((k, IMG_LENGTH))
+        r = np.zeros((k, IMG_LENGTH), dtype=np.uint8)
         for i in range(IMG_LENGTH):
             cluster[i] = MinDistCluster(U[i], c)
             r[int(cluster[i])][i] = 1
@@ -158,8 +153,9 @@ def Kmean(k, U, img):
             data_for_k = np.zeros(k)
             for i in range(IMG_LENGTH):
                 if cluster[i] == n:
-                    data_for_k += U[i]
-            c[n] = data_for_k / r_sum
+                    data_for_k = data_for_k + U[i]
+            if r_sum != 0:
+                c[n] = data_for_k / r_sum
         # Visualization
         iter += 1
         Visualization(cluster, iter, img)
@@ -178,7 +174,7 @@ def Visualization(cluster, iter, orig_img):
     # Cluster the image
     for i in range(IMG_LENGTH):
         img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = COLOR[int(cluster[i])]
-        o_img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = orig_img[i][1]
+        o_img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = orig_img[i]
     # Change BGR to RGB
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     o_img = cv2.cvtColor(o_img, cv2.COLOR_RGB2BGR)
@@ -194,7 +190,7 @@ def Visualization(cluster, iter, orig_img):
     plt.imshow(o_img)
 
     plt.show()
-    fig.savefig(f'./spetral_normal_random_k3_image2/{iter}.png')
+    fig.savefig(f'./spetral_normal_random_k4_image1/{iter}.png')
 
 
 def PlotEigenspace(k, U, cluster):
@@ -222,21 +218,21 @@ def PlotEigenspace(k, U, cluster):
         for n in range(k):
             ax.scatter(x[n], y[n], z[n], color=COLOR_SCATTER[n], s=0.5)
     plt.show()
-    fig.savefig(f'./spetral_normal_random_k3_image2/eigenspace.png')
+    fig.savefig(f'./spetral_normal_random_k4_image1/eigenspace.png')
 
 
 def NormalizedCut(k, D, W):
     'Normalized cut for spetral cluster.\nOutput : eigenvector matrix, normalized matrix'
     # Calculate Laplacian matrix L = D - W
     L = D - W
+    # I = np.identity(IMG_LENGTH)
     # Calculate normalied Laplacian matrix Lsym = D^(-1/2)*L*D^(-1/2)
     D_sqrt = np.sqrt(D)
-    D_inv = np.zeros((IMG_LENGTH, IMG_LENGTH))
     for i in range(IMG_LENGTH):
         if D_sqrt[i][i] != 0:
-            D_inv[i][i] = 1 / D_sqrt[i][i]
-    Lsym = np.matmul(np.matmul(D_inv, L), D_inv)
-    # print('Lsym ', Lsym[0])
+            D_sqrt[i][i] = 1 / D_sqrt[i][i]
+    Lsym = np.matmul(np.matmul(D_sqrt, L), D_sqrt)
+    # Lsym = I - np.matmul(np.matmul(D_sqrt, W), D_sqrt)
     # Compute eigenvector matrix U(n*k)
     eigenValue, eigenVector = np.linalg.eig(Lsym)
     eigenIndex = np.argsort(eigenValue) # sort eigenvalues
@@ -254,22 +250,16 @@ def RatioCut(k, D, W):
     # Compute eigenvector matrix U(n*k)
     eigenValue, eigenVector = np.linalg.eig(L)
     eigenIndex = np.argsort(eigenValue) # sort eigenvalues
-    U = eigenVector[:, eigenIndex[1:(k+1)]]  # except first eigenvector 
+    eigenVector = eigenVector[:, eigenIndex]  # except first eigenvector
+    U = eigenVector[:, 1:(k+1)].real
     return U
-
-# In[2]:
-
 
 
 if __name__ == '__main__':
     Image1, Image2 = InputData()
     gammaS = 1 / IMG_LENGTH
-    gammaC = 1 / 256
-    K = 3
-
-
-# In[2]:
-
+    gammaC = 1 / IMG_LENGTH
+    K = 4
 
     # Compute the Gram matrix by kernel and the degree matrix
     print("Compute Gram matrix for image1......")
@@ -279,24 +269,20 @@ if __name__ == '__main__':
     W2 = GramMatrix(Image2, gammaS, gammaC)
     D2 = DegreeMatrix(W2)
 
-# In[2]:
-
     # Spectral cluster
     # Normalized cut
-    # U1, T1 = NormalizedCut(K, D1, W1)   # image1
+    U1, T1 = NormalizedCut(K, D1, W1)   # image1
     U2, T2 = NormalizedCut(K, D2, W2) # image2
     # Ratio cut
     # U1 = RatioCut(K, D1, W1) # image1
     # U2 = RatioCut(K, D2, W2) # image2
 
-    # res1 = Kmean(K, T1, Image1)  # image1 for normalized cut
-    res2 = Kmean(K, T2, Image2)  # image2 for normalized cut
+    res1 = Kmean(K, T1, Image1)  # image1 for normalized cut
+    # res2 = Kmean(K, T2, Image2)  # image2 for normalized cut
     # res1 = Kmean(K, U1, Image1)  # image1 for ratio cut
     # res2 = Kmean(K, U2, Image2)  # image2 for ratio cut
     # Plot the eigenspace of graph Laplacian
 
     if K < 4:
-        # PlotEigenspace(K, U1, res1) # image1
-        PlotEigenspace(K, U2, res2) # image2
-
-# %%
+        PlotEigenspace(K, U1, res1) # image1
+        # PlotEigenspace(K, U2, res2) # image2
