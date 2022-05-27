@@ -84,7 +84,6 @@ def MinDist(x, centers):
 
 def InitialMean(mode, k, U):
     'Initial the mean for k-mean by mode. Random mode = 1, ++ mode = 2.\nOutput : k centers'
-    # assign = np.zeros((k, IMG_LENGTH))
     C = np.zeros((k, k), dtype=np.float32)
     if mode == 1:
         # Random pick k canters
@@ -137,7 +136,6 @@ def Kmean(k, U, img):
     c = InitialMean(mode=1, k=k, U=U)
     iter = 0
     converge = 0
-    # assign = np.copy(init_a)
     cluster = np.zeros(IMG_LENGTH, dtype=np.uint32)
     # Until converge -> converge time = 3
     while converge < 1:
@@ -225,14 +223,12 @@ def NormalizedCut(k, D, W):
     'Normalized cut for spetral cluster.\nOutput : eigenvector matrix, normalized matrix'
     # Calculate Laplacian matrix L = D - W
     L = D - W
-    # I = np.identity(IMG_LENGTH)
     # Calculate normalied Laplacian matrix Lsym = D^(-1/2)*L*D^(-1/2)
     D_sqrt = np.sqrt(D)
     for i in range(IMG_LENGTH):
         if D_sqrt[i][i] != 0:
             D_sqrt[i][i] = 1 / D_sqrt[i][i]
     Lsym = np.matmul(np.matmul(D_sqrt, L), D_sqrt)
-    # Lsym = I - np.matmul(np.matmul(D_sqrt, W), D_sqrt)
     # Compute eigenvector matrix U(n*k)
     eigenValue, eigenVector = np.linalg.eig(Lsym)
     eigenIndex = np.argsort(eigenValue) # sort eigenvalues

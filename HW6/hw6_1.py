@@ -10,7 +10,6 @@ Kernel k-means
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-# from scipy.spatial.distance import dis
 
 # 100*100 image, each pixel in the image is treated as a data point -> 10000 datapoints
 IMG_SIZE = 100
@@ -23,20 +22,21 @@ def InputData():
     # Read images using matplotlib
     read1 = cv2.imread('image1.png')
     read2 = cv2.imread('image2.png')
-    img1 = []
-    img2 = []
+    img1 = np.zeros((IMG_LENGTH, 3), dtype=np.float32)
+    img2 = np.zeros((IMG_LENGTH, 3), dtype=np.float32)
     for i in range(IMG_SIZE):
         for j in range(IMG_SIZE):
             # coordinate of data, RGB of data
-            img1.append((np.array([j, i]), read1[i][j]))
-            img2.append((np.array([j, i]), read2[i][j]))
+            img1[int(i*IMG_SIZE+j)] = np.array(read1[i][j], dtype=np.uint32)
+            img2[int(i*IMG_SIZE+j)] = np.array(read2[i][j], dtype=np.uint32)
     return img1, img2
 
 
 def Distance(x1, x2):
     'Calculate the distance between two points.\nOutput : distance'
-    dis = np.sum((x1 - x2) ** 2)
-    return dis
+    x = (x1%IMG_SIZE) - (x2%IMG_SIZE)
+    y = (x1//IMG_SIZE) - (x2//IMG_SIZE)
+    return (x**2) + (y**2)
 
 
 def Kernel(x1, x2, gammaS, gammaC):
@@ -44,56 +44,55 @@ def Kernel(x1, x2, gammaS, gammaC):
     # Multiplying two RBF kernels in order to consider spatial similarity and color similarity at the same time.
     # kernel(x, x') = exp(-gammaS * ||S(x)-S(x')||^2) * exp(-gammaC * ||C(x)-C(x')||^2)
     spatial = -gammaS * Distance(x1[0], x2[0])
-    color = -gammaC * Distance(x1[1], x2[1])
+    color = -gammaC * np.sum((x1[1] - x2[1]) ** 2)
     kernel = np.exp(spatial) * np.exp(color)
     return kernel
 
 
 def GramMatrix(data, gammaS, gammaC):
     'Compute Gram matrix by defined kernel.\nOutput : Gram matrix'
-    matrix = np.zeros((IMG_LENGTH, IMG_LENGTH))
+    matrix = np.zeros((IMG_LENGTH, IMG_LENGTH), dtype=np.float32)
     for i in range(IMG_LENGTH):
         for j in range(i, IMG_LENGTH):
-            matrix[i][j] = Kernel(data[i], data[j], gammaS, gammaC)
+            matrix[i][j] = Kernel([i, data[i]], [j, data[j]], gammaS, gammaC)
             matrix[j][i] = matrix[i][j]
     return matrix
 
 
 def MinDist(index, centers):
     'Find the min distance to centers.\nOutput : min distance'
-    min_dist = 1000000 
+    dis = []
     x = index % IMG_SIZE
     y = index // IMG_SIZE
     # Compute spatial distance
     for i in range(len(centers)):
         c_x = centers[i] % IMG_SIZE
         c_y = centers[i] // IMG_SIZE
-        dis = (x-c_x) ** 2 + (y-c_y) ** 2
-        if dis < min_dist:
-            min_dist = dis
-    return min_dist
+    # Compute spatial distance
+    for i in range(len(centers)):
+        dis.append((x-c_x) ** 2 + (y-c_y) ** 2)
+    return np.min(dis)
 
 
 def InitialMean(mode, k):
     'Initial the mean for k-mean by mode. Random mode = 1, ++ mode = 2.\nOutput : initial C and a of k centers'
-    assign = np.zeros((k, IMG_LENGTH))
-    C = np.zeros(k)
+    assign = np.zeros((k, IMG_LENGTH), dtype=np.uint32)
+    C = np.zeros(k, dtype=np.float32)
     if mode == 1:
         # Random pick k canters
         center_index = np.random.choice(IMG_LENGTH, k, replace=False)
-        # print(index)
         for n in range(k):
             assign[n][center_index[n]] = 1
     elif mode == 2:
         # k-mean++
-        center_index = np.zeros(k)
+        center_index = np.zeros(k, dtype=np.uint32)
         # random pick first center
         center_index[0] = np.random.randint(low=0, high=IMG_LENGTH)
         assign[0][int(center_index[0])] = 1
         # find the farest point to give high probability
         for n in range(1, k):
             dist_sum = 0
-            min_dis = np.zeros(IMG_LENGTH)
+            min_dis = np.zeros(IMG_LENGTH, dtype=np.float32)
             for i in range(IMG_LENGTH):
                 min_dis[i] = MinDist(i, center_index)
                 dist_sum += min_dis[i]
@@ -122,7 +121,7 @@ def Converge(old_assign, new_assign):
 def KernelDist(k, kernel, c, a):
     'Distance between data and center of kernel k-mean.\nOutput : array of distance'
     # kernel(x, x) = 1
-    dis = np.ones((k, IMG_LENGTH))
+    dis = np.ones((k, IMG_LENGTH), dtype=np.float32)
     for n in range(k):
         # term 2 = -2 * sum_i(an*kernel(i, all)) / cn
         alpha = a[n].reshape(IMG_LENGTH, 1)
@@ -142,7 +141,7 @@ def Kmean(k, init_c, init_a, kernel, img):
     converge = 0
     c = np.copy(init_c)
     assign = np.copy(init_a)
-    cluster = np.zeros(IMG_LENGTH)
+    cluster = np.zeros(IMG_LENGTH, dtype=np.uint32)
     # Until converge -> converge time = 3
     while converge < 3:
         old_assign = np.copy(assign)
@@ -173,7 +172,7 @@ def Visualization(cluster, iter, orig_img):
     # Cluster the image
     for i in range(IMG_LENGTH):
         img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = COLOR[int(cluster[i])]
-        o_img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = orig_img[i][1]
+        o_img[int(i//IMG_SIZE)][int(i%IMG_SIZE)] = orig_img[i]
     # Change BGR to RGB
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     o_img = cv2.cvtColor(o_img, cv2.COLOR_RGB2BGR)
@@ -189,14 +188,14 @@ def Visualization(cluster, iter, orig_img):
     plt.imshow(o_img)
 
     plt.show()
-    fig.savefig(f'./kernel_plusplus_k3_image1/{iter}.png')
+    fig.savefig(f'./kernel_random_k4_image1/{iter}.png')
 
 
 if __name__ == '__main__':
     Image1, Image2 = InputData()
     gammaS = 1 / IMG_LENGTH
-    gammaC = 1 / 256
-    K = 3
+    gammaC = 1 / IMG_LENGTH
+    K = 4
 
     # Compute the Gram matrix by kernel
     print("Compute Gram matrix for image1......")
@@ -206,6 +205,7 @@ if __name__ == '__main__':
 
     # Kernel K-mean
     # Initial, random mode = 1, k-mean++ mode = 2
-    init_C, init_a = InitialMean(mode=2, k=K)
+    init_C, init_a = InitialMean(mode=1, k=K)
+
     Kmean(K, init_C, init_a, gram_matrix1, Image1)  # image1
-    Kmean(K, init_C, init_a, gram_matrix2, Image2)  # image2
+    # Kmean(K, init_C, init_a, gram_matrix2, Image2)  # image2
