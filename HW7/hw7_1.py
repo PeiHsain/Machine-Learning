@@ -72,7 +72,7 @@ def LinerKernel(x1, x2):
     return kernel
 
 
-def PolyKernel(x1, x2, gamma=0.01, coef=0.1, degree=2):
+def PolyKernel(x1, x2, gamma=0.1, coef=0.5, degree=2):
     'Polynomial kernel function.\nOutput : kernel value'
     # kernel(x, x') = (gamma * (xT * x') + coef)^degree
     kernel = gamma * np.matmul(x1, x2.T)
@@ -80,13 +80,13 @@ def PolyKernel(x1, x2, gamma=0.01, coef=0.1, degree=2):
     return kernel
 
 
-def RBFKernel(x1, x2, gamma=1e-11):
+def RBFKernel(x1, x2, gamma=1e-10):
     'RBF kernel function.\nOutput : kernel value'
     # diff = np.sum(xn ** 2, axis=1).reshape(-1, 1) + np.sum(xm ** 2, axis=1) - 2 * xn @ xm.T
     # ||x-x'||^2 = ||x||^2 - 2*xT*x' + ||x'||^2   -> norm ||x||^2 = sum(xi^2)
     diff = np.sum(x1**2, axis=1).reshape(-1, 1) - (2*np.matmul(x1, x2.T)) + np.sum(x2**2, axis=1)
     # kernel(x, x') = exp(-gama * (||x-x'||^2))
-    kernel = (-gamma) * diff
+    kernel = (-gamma) * diff    
     kernel = np.exp(kernel)
     return kernel
 
@@ -96,23 +96,27 @@ def Kernal(x1, x2, mode):
     if mode == 1:
         print('Use linear kernel')
         kernel = LinerKernel(x1, x2)
+        return kernel
     elif mode == 2:
         print('Use polynomial kernel')
         kernel = PolyKernel(x1, x2)
+        return kernel
     elif mode == 3:
         print('Use RBF kernel')
         kernel = RBFKernel(x1, x2)
-    return kernel   
+        return kernel
 
 
-def Reconstruction(eigen, mean, x, save_path, k, n):
+def Reconstruction(eigen, mean, x, save_path, k, n, scale=1):
     'show the first k(25) eigenfaces, and randomly pick n(10) images to show their reconstruction.'
     size = np.sqrt(k)
+    height = HEIGHT // scale
+    width = WIDTH // scale
     # Show and save eigenface
     fig = plt.figure(figsize=(11, 11))
     plt.title('25 Eigenface')
     for i in range(k):
-        eigenface = eigen[:, i].reshape((HEIGHT, WIDTH))
+        eigenface = eigen[:, i].reshape(height, width)
         ax = fig.add_subplot(int(size), int(size), i+1)
         ax.imshow(eigenface, cmap='gray')
     FILE_NAME = f'{k}eigenface.jpg'
@@ -125,7 +129,7 @@ def Reconstruction(eigen, mean, x, save_path, k, n):
     random_num = np.random.choice(TRAIN_SET, size=n, replace=False)
     for i in range(n):
         # original face
-        originalface = x[random_num[i]].reshape((HEIGHT, WIDTH))
+        originalface = x[random_num[i]].reshape(height, width)
         ax = fig.add_subplot(2*2, int(n/2), i+1)
         ax.set_title(f'Original {random_num[i]}')
         ax.imshow(originalface, cmap='gray')
@@ -135,7 +139,7 @@ def Reconstruction(eigen, mean, x, save_path, k, n):
         ax.set_title(f'Reconstruct {random_num[i]}')
         # reconstruction = meanface + (x - mean) * W * WT -> 1*N
         reconstruct = mean + np.matmul(np.matmul((x[random_num[i]]-mean), eigen), eigen.T)
-        reconstruvtface = reconstruct.reshape((HEIGHT, WIDTH))
+        reconstruvtface = reconstruct.reshape(height, width)
         ax.imshow(reconstruvtface, cmap='gray')
     FILE_NAME = f'{n}reconstructface.jpg'
     fig.savefig(save_path + FILE_NAME)
@@ -164,11 +168,8 @@ def KernelPCA(x, k=25, mode=1):
     'Use kernel PCA to do face recognition. mode=1: linear, mode=2: poly, mode=3: RBF\nOutput : eigenvector matrix, kernel_x'
     # Kernel x -> mode=1: linear, mode=2: poly, mode=3: RBF
     kernel = Kernal(x, x, mode)
-    # Center kernel data KC = K - array_N(1/N) * K - K * array_N(1/N) + array_N(1/N) * K * array_N(1/N)
-    matrix_1N = np.full((TRAIN_SET, TRAIN_SET), 1/TRAIN_SET)
-    KC = kernel - matrix_1N @ kernel - kernel @ matrix_1N + matrix_1N @ kernel @ matrix_1N
     # Orthogonal projection W = k first largest eigenvectors
-    eigenValue, eigenVector = np.linalg.eig(KC)
+    eigenValue, eigenVector = np.linalg.eig(kernel)
     eigenIndex = np.argsort(-eigenValue) # sort eigenvalues
     # Normalize eigenvectors
     norm_eigen = np.linalg.norm(eigenVector, axis=0)
@@ -178,12 +179,70 @@ def KernelPCA(x, k=25, mode=1):
     return W, kernel
 
 
-def LDA():
+def Compression(data, scale):
+    'Compress the data by the scale.\nOutput : compressed data'
+    data_num = len(data)
+    new_width = WIDTH//scale
+    new_heigh = HEIGHT//scale
+    new_data = np.zeros((data_num, new_heigh, new_width))
+    for n in range(data_num):
+        data_matix = data[n].reshape(HEIGHT, WIDTH)
+        for i in range(new_heigh):  # x axis
+            row_start = i * scale
+            for j in range(new_width):  # y axis
+                col_start = j * scale
+                # let mean of scale*scale matrix values as new compressed value
+                new_data[n][i][j] = int(np.mean(data_matix[row_start:(row_start+scale), col_start:(col_start+scale)]))
+    return new_data.reshape(data_num, -1)
+
+
+def LDA(x, k=25):
     'Use LDA to do face recognition.\nOutput : eigenvector matrix, meanface'
+    # Mean m = sum(x) / N
+    m = np.mean(x, axis=0)
+    matrix_size = len(m)
+    Sw = np.zeros((matrix_size, matrix_size), dtype=np.float32)
+    Sb = np.zeros((matrix_size, matrix_size), dtype=np.float32)
+    for j in range(SUBJECT):
+        start = j * TYPE_TRAIN
+        xi = x[start:(start+TYPE_TRAIN)]
+        # Class mean mj = sum(xi) / nj
+        mj = np.mean(xi, axis=0)
+        # Within-class scatter Sw = sum_j(Swj) = sum_i((xi-mj) * (xi-mj)T)
+        diff = (xi - mj)
+        Sw += diff.T @ diff
+        # Between-class scatter Sb = sum_j(Sbj) = sum_j(nj * (mj-m) * (mj-m)T)
+        diff = (mj - m).reshape(1, -1)
+        Sb += TYPE_TRAIN * diff.T @ diff
+    # Projection W = k first largest eigenvectors of (Sw^-1 * Sb)
+    eigenValue, eigenVector = np.linalg.eig(Sb @ np.linalg.pinv(Sw))
+    eigenIndex = np.argsort(-eigenValue) # sort eigenvalues
+    # Normalize eigenvectors
+    norm_eigen = np.linalg.norm(eigenVector, axis=0)
+    for i in range(len(norm_eigen)):
+        eigenVector[:, i] /= norm_eigen[i]
+    W = eigenVector[:, eigenIndex[:k]].real # k first eigenvectors
+    return W, m
 
 
-def KernelLDA():
+def KernelLDA(x, k=25, mode=1):
     'Use kernel LDA to do face recognition. mode=1: linear, mode=2: poly, mode=3: RBF\nOutput : eigenvector matrix, kernel_x'
+    # Kernel x -> mode=1: linear, mode=2: poly, mode=3: RBF
+    kernel = Kernal(x, x, mode)
+    # array_N(1/N)
+    matrix_1N = np.full((TRAIN_SET, TRAIN_SET), 1/TRAIN_SET)
+    # Within-class scatter Sw and Between-class scatter Sb
+    Sw = kernel @ kernel
+    Sb = kernel @ matrix_1N @ kernel
+    # Projection W = k first largest eigenvectors of (Sw^-1 * Sb)
+    eigenValue, eigenVector = np.linalg.eig(np.linalg.pinv(Sw) @ Sb)
+    eigenIndex = np.argsort(-eigenValue) # sort eigenvalues
+    # Normalize eigenvectors
+    norm_eigen = np.linalg.norm(eigenVector, axis=0)
+    for i in range(len(norm_eigen)):
+        eigenVector[:, i] /= norm_eigen[i]
+    W = eigenVector[:, eigenIndex[:k]].real # k first eigenvectors
+    return W, kernel
 
 
 def Distance(train, test):
@@ -217,12 +276,8 @@ def Recognition(train, test, eigen, mean, knn=5):
 def KernelRecognition(train, test, eigen, train_kernel, k_mode, knn=5):
     'Face recognition. Use k nearest neighbor to classify which subject.\nOutput : the prediction'
     # Project kernel test and kernel train data into eigenvectors
-    train_proj = np.matmul(train_kernel, eigen)
-    # Center test kernel values
     test_kernel = Kernal(test, train, k_mode)
-    matrix_1N_test = np.full((TEST_SET, TEST_SET), 1/TEST_SET)
-    matrix_1N_train = np.full((TRAIN_SET, TRAIN_SET), 1/TRAIN_SET)
-    KC = test_kernel - matrix_1N_test @ test_kernel - test_kernel @ matrix_1N_train + matrix_1N_test @ test_kernel @ matrix_1N_train
+    train_proj = np.matmul(train_kernel, eigen)
     test_proj = np.matmul(test_kernel, eigen)
 
     # K nearest neighbor to classify
@@ -249,49 +304,62 @@ def Accuracy(pred):
     print(f'Accuracy = {acc}')
 
 
-
 # In[]
 if __name__ == '__main__':
     train_set, test_set = InputData()
     train_set = np.array(train_set)
     test_set = np.array(test_set)
+
 # In[]
     K = 25
     N = 10
-    KNN = 5
+    KNN = 7
     # mode=1: linear kernel, mode=2: poly kernel, mode=3: RBF kernel
-    K_mode = 2
+    K_mode = 1
 
 # In[]
     # PCA
     FILE_PATH = './PCA/'
-    pca_W, pca_mean = PCA(train_set)
-    # Reconstruction(pca_W, pca_mean, train_set, FILE_PATH, K, N)
+    pca_W, pca_mean = PCA(train_set, K)
+    Reconstruction(pca_W, pca_mean, train_set, FILE_PATH, K, N)
     pca_pred = Recognition(train_set, test_set, pca_W, pca_mean, KNN)
     print('PCA method performance :')
     Accuracy(pca_pred)
 
 # In[]
     # LDA
+    # Original size too large to calculate, compress it
+    SCALE = 3
+    compress_train = Compression(train_set, SCALE)
+    compress_test = Compression(test_set, SCALE)
+
     FILE_PATH = './LDA/'
-    lda_W, lda_mean = LDA(train_set)
-    Reconstruction(lda_W, lda_mean, train_set, FILE_PATH, K, N)
-    lda_pred = Recognition(train_set, test_set, lda_W, lda_mean, KNN)
+    lda_W, lda_mean = LDA(compress_train, K)
+    Reconstruction(lda_W, lda_mean, compress_train, FILE_PATH, K, N, SCALE)
+    lda_pred = Recognition(compress_train, compress_test, lda_W, lda_mean, KNN)
     print('LDA method performance :')
     Accuracy(lda_pred)
 
 # In[]
     # Kernel PCA
-    kpca_W, kpca_k = KernelPCA(train_set, K, K_mode)
-    kpca_pred = KernelRecognition(train_set, test_set, kpca_W, kpca_k, K_mode, KNN)
+    # Center the data
+    mean = np.mean(train_set, axis=0)
+    center_train = train_set - mean
+    center_test = test_set - mean
+
+    kpca_W, kpca_k = KernelPCA(center_train, K, K_mode)
+    kpca_pred = KernelRecognition(center_train, center_test, kpca_W, kpca_k, K_mode, KNN)
     print('Kernel PCA method performance :')
     Accuracy(kpca_pred)
 
 # In[]
     # Kernel LDA
-    klda_W, klda_mean = KernelLDA(train_set)
-    klda_pred = Recognition(train_set, test_set, klda_W, klda_mean, KNN)
+    # Center the data
+    mean = np.mean(train_set, axis=0)
+    center_train = train_set - mean
+    center_test = test_set - mean
+
+    klda_W, klda_k = KernelLDA(center_train, K, K_mode)
+    klda_pred = KernelRecognition(center_train, center_test, klda_W, klda_k, K_mode, KNN)
     print('Kernel LDA method performance :')
     Accuracy(klda_pred)
-
-# %%
