@@ -52,3 +52,11 @@ following Bernoulli distributions. (Training data and label sets are same as HW0
 2. Spectral clustering
 
     Implement spectral clustering, both normalized cut and ratio cut.
+# HW7
+1. Kernel Eigenfaces
+
+    Use PCA and LDA, kernel PCA and kernel LDA to do face recognition, and compute the performance.
+    
+2. t-SNE
+
+    Modify the reference t-SNE code a little bit and make it back to symmetric SNE, and visualize the embedding and the distribution.
